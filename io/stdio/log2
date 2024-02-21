@@ -1,0 +1,30 @@
+
+栈(F)        静态区(F)        堆(T)
+FILE *fopen(const char *pathname, const char *mode){
+	//如果是栈
+	FILE tmp;
+	tmp. = ;
+	...	
+	return &tmp;//如果是栈，tmp会被销毁
+	
+	//如果是静态区
+	static FILE tmp;//只能打开一个文件，开多个文件前一个就不能用了
+	
+
+	//如果是堆
+	FILE * tmp = NULL;
+	tmp = malloc(sizeof(FILE));
+	tmp-> = ;
+	..
+	return tmp ;
+}
+
+另一种方式判断 fopen();fclose();对应的malloc和free
+有逆操作的，指针一定在堆上;没有也不一定不在堆上
+
+
+
+
+
+
+

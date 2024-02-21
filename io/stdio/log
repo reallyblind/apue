@@ -1,0 +1,92 @@
+
+
+
+
+
+
+int * p =(int *) malloc(sizeof(int));
+/*wrong, you didn't have the head file <stdlib.h>.Editer didn't see the function declare
+ so that it will think this function will return a type of int ,
+ pass int to int* ,of course it will have wran. Void * can be passed to any type of *.
+*/
+
+The right way:
+
+#include<stdlib>
+int *p = malloc(sizeof(int));
+
+
+
+errno仅仅是一个值，无法看到具体的错误原
+fprintf(stderr,"fopen() failed! errno = %d\n",errno);
+fopen() failed! errno = 2
+
+
+perror("fopen()");也可以报错
+fopen(): No such file or directory
+
+fprintf(stderr,"fopen():%s\n",strerror(errno));     sterror函数    char *strerror(int errnum);
+fopen():No such file or directory
+
+
+在不更改当前默认环境的情况下，在一个进程打开的时候默认打开三个流
+stdin   stdout   stderr
+1021+3 = 1024，一个进程空间最多打开1024个文件 通过ulimit -a 中的open files更改数目
+
+新文件权限默认
+0666 & ~umask    umask=0002 目前
+所以创建的tmp为-rw-rw-r-- 1 wangwenghan wangwenghan 0 12月 15 12:44 tmp
+
+#define SIZE 5
+char buf[SIZE];
+fgts(bug,SIZE,stream);
+fgets(* , size , stream);两种可能造成该函数正常结束
+读到size-1个字节(操作字符串，最后一个留给'/0')：
+读到'\n'：
+
+
+读取'abcdef'
+第一次 abcd'\0'
+
+读取'ab'
+即使最后一行最后也会有个换行符'\n'
+ab'\n''\0'
+
+读取'abcd'
+需要读2次
+ 1-> a b c d '\0'
+ 2-> '\n' '\0'
+
+
+fread(buf,size,nmemb,fp);fread和fget只能操作数据块公共整整的，所以直接一次读一个当作fgetc来用
+1->数据量足够
+2->只有5个字节
+
+fread(buf,1,10,fp);
+1->   返回值10 ->10字节
+2->          5 -> 5字节
+
+fread(buf,10,1,fp);
+1->   1  -> 10字节
+2->   0  ->  ???,文件剩余字节不知道了
+所以大部分就把size设为1,当作fgetc用
+
+
+fseek(FILE * stream,long offset , int whence):
+
+fp = fopen();
+fputc(fp)  执行10次,写入了10个字符，此时文件位指针向后移动了10
+fgetc()  读10次，并不能得到那10个字符，因为此时文件指针在文件末尾，你可以关闭文件再打开从头读
+
+fputc(fp)  执行10次
+fseek(fp,-10,SEEK_CUR)//当前光标位置前10个字符去读
+fseek(fp,0L,SEEK_SET); //文件首开始读
+rewind(); equal to fseek(fp,0L,SEEK_SET)
+fgetc()  读10次
+
+
+
+
+
+
+
