@@ -1,0 +1,30 @@
+
+fd = open();
+if(fd < 0)
+{
+	perror();
+	exit(1);
+}
+		---->clean_up_push; --> close(fd1);
+		由于pthread_cancel只会发生在cancel点的位置,而POSIX定义的cancel点的位置是可能引发阻塞的系统调用,所以不怕cancel在刚open完没有挂到钩子上就cancel了
+上面来了个cancel,会推迟到下面的cancel点,即发现当前执行的函数不是cancel点,那么不cancel,继续向下执行,到下面的open函数发现是cancel点,于是cancel
+
+fd2 = open();
+
+if(fd2 < 0)
+{
+	perror();
+	exit(1);
+}
+		---->clean_up_push; --> close(fd2);
+
+
+
+
+
+
+
+
+
+
+

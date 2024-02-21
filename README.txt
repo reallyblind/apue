@@ -763,12 +763,56 @@ struct spwd {
 
 2. 线程的创建
 	pthread_create;
+	int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                          void *(*start_routine) (void *), void *arg);
+	第一个参数是线程id的地址,第二个是状态,默认填NULL,第三个是线程函数,第四个是线程所需参数
+	线程的调度取决于调度器策略
 
    线程的终止
+	3种方式:
+	1) 线程从启动例程返回,返回值就是线程的退出码
+	2) 线程可以被同一线程中的其他线程取消
+	3) 线程调用pthread_exit()函数
+
+	return一般表示的是函数的退出,线程的退出要用pthread_exit
+	线程的清理需要用pthread_exit
+
+	pthread_join();线程的收尸 --->  wait();
+	int pthread_join(pthread_t thread, void **retval);
+	retval传一级指针的地址用于查看状态,查看收尸的状态	
+	pthread_join可指定要收的线程,wait是收一个尸,收回来才知道是谁
+
    栈的清理
+	pthread_cleanup_push();
+		
+	pthread_cleanup_pop();
+	这两个是宏,不是函数
+	gcc cleanup.c -E
+	pthread_clean_pop如果放到pthread_exit后仍然会被调用,不过默认为1
+		参数决定钩子函数是否被调用,真,说明从钩子上取出来的函数需要被调用,假,不被调用
+	
+
+
    线程的取消选项
+	cancel后才可以收尸pthread_join
+	线程取消:
+		pthread_cancel();
+		取消有两种状态: 允许 和 不允许
+		允许取消又分为 : 异步cancel  和  推迟cancel(默认) ->推迟到cancel点再去响应
+		cancel点: POSIX定义的cancel点,都是可能引发阻塞的系统调用
+
+		int pthread_setcancelstate(int state, int *oldstate);设置是否允许取消
+		int pthread_setcanceltype(int type, int *oldtype);设置取消方式(异步cancel或者推迟cancel)
+
+		void pthread_testcancel(void);设置取消点,本函数什么都不做,就是一个取消点.如果函数中全是科学计算,没有任何的系统调用,所以没有cancel点,此时发现出错要取消,需要设置cancel点才能取消
+	
+    线程分离:
+		int pthread_detach(pthread_t thread);不关心这个线程的生死存亡,无需回收,设置了线程分离就不能pthread_join回来
+
 
 3. 线程同步
+
+
 
 4. 线程属性
    线程同步的属性
