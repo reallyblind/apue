@@ -704,7 +704,7 @@ struct spwd {
 
 	usleep(),nanosleep()可以来替换sleep
 
-	selete():也可以实现休眠
+	select():也可以实现休眠
 
 
 7. 信号集
@@ -811,12 +811,43 @@ struct spwd {
 
 
 3. 线程同步
+	互斥量:	pthread_mutex_t
+		pthread_mutex_init()
+		pthread_mutex_destroy();
+		
+		pthread_mutex_lock();
+		pthread_mutex_trylock();
+		pthread_mutex_unlock();
 
+		pthread_once();只调用一次
+		pthread_once(&init_once,module_load);
+		相当于
+		/*
+		   pthread_mutex_lock();
+		   if(!inited)
+		   {
+		   module_load();
+		   inited = 1;
+		   }
+		   unlock();
+		 */
+	
+	条件变量(通知法):
+		pthread_cond_t cond;
+		pthread_cond_init
+		pthread_cond_destroy
+		pthread_cond_broadcast(pthread_cont_t *cond);//全部叫醒
+		pthread_cond_signal();//叫醒某一个不清楚
+		pthread_cond_timewait();
+		pthread_cond_wait();
+
+	临界区要注意锁的情况,要注意临界区内所有的跳转语句:continue,break,函数,goto,如果跳转到临界区外,一定要先解锁再跳转
+primer0_busy.c
 
 
 4. 线程属性
    线程同步的属性
-
+	
 5. 重入
    线程与信号的关系
    线程与fork

@@ -8,10 +8,15 @@
 #define RIGHT	30000200
 #define THRNUM	(RIGHT-LEFT+1)
 
+struct thr_arg_st
+{
+	int n;
+};
 static void *thr_prime(void *p)
 {
 	int j;
-	int i =(int) p;
+	int i =((struct thr_arg_st*) p)->n;
+//	free(p);
 	int mark = 1;
 	for(j = 2 ; j < i/2 ; j++)
 	{
@@ -23,7 +28,7 @@ static void *thr_prime(void *p)
 	}
 	if(mark)
 		printf("%d is a primer\n",i);
-	pthread_exit(NULL);
+	pthread_exit(p);
 }
 
 int main()
@@ -31,9 +36,19 @@ int main()
 	int i,j, mark = 1;
 	pthread_t tid[THRNUM];
 	int err;
+	struct thr_arg_st *p;
+	void *ptr;
 	for( i = LEFT ; i <= RIGHT ; i++)
 	{
-		err = pthread_create(tid+(i-LEFT),NULL,thr_prime,(void *)i);
+		p = malloc(sizeof(*p));
+		if(p == NULL)
+		{
+			perror("malloc");
+			exit(1);
+		}
+		p->n = i;
+
+		err = pthread_create(tid+(i-LEFT),NULL,thr_prime,p);
 		if(err)
 		{
 			fprintf(stderr,"pthread_create():%s\n",strerror(err));
@@ -45,10 +60,10 @@ int main()
 	}
 
 	for(i = LEFT; i <= RIGHT ; i++)
-		pthread_join(tid[i-LEFT],NULL);
-
-
-
+	{
+		pthread_join(tid[i-LEFT],&ptr);
+		free(ptr);
+	}
 	exit(0);
 }
 /*
