@@ -746,6 +746,14 @@ struct spwd {
 
 二  线程
 
+线程工作模式:
+	1.流水线 * -> 0 -> 0 -> 0
+	2.工作组模式	0 -> 0 -> 0
+			  -> 0 ->
+			  -> 0 ->
+	3.c/s	客户端,服务器端
+
+
 
 1. 线程的概念
 	main线程,不要说主线程,没有主次之分
@@ -810,7 +818,7 @@ struct spwd {
 		int pthread_detach(pthread_t thread);不关心这个线程的生死存亡,无需回收,设置了线程分离就不能pthread_join回来
 
 
-3. 线程同步
+3. 线程同步	abcd.c	abcd_e.c  mytbf
 	互斥量:	pthread_mutex_t
 		pthread_mutex_init()
 		pthread_mutex_destroy();
@@ -832,26 +840,405 @@ struct spwd {
 		   unlock();
 		 */
 	
-	条件变量(通知法):
+	条件变量(通知法):	mytbf.c
 		pthread_cond_t cond;
 		pthread_cond_init
 		pthread_cond_destroy
-		pthread_cond_broadcast(pthread_cont_t *cond);//全部叫醒
+		pthread_cond_broadcast(pthread_cont_t
+*cond);//发消息,发通知打断一个pthread_cond_wait,全部叫醒
 		pthread_cond_signal();//叫醒某一个不清楚
 		pthread_cond_timewait();
-		pthread_cond_wait();
+		pthread_cond_wait();,没有锁就先等,等到抢到锁
+	
+	信号量: 没有一个单独的机制
+		互斥量+条件变量实现一个 	mysem.c
+		mysem
+		10人吃面,5根筷子,发信号谁用谁拿
+
+	读写锁:
+		读锁->共享锁 + 写锁->互斥锁
+	r -> 共享
+	w -> 互斥
+	避免写者饿死:
+两个人读文件,加了读锁,来了一个写文件,w等待,但是其他读者不再加读锁,相当于加了个w锁,等两个人读完,w进去,等w退出,释放w锁,其他可再读.
+	
+
 
 	临界区要注意锁的情况,要注意临界区内所有的跳转语句:continue,break,函数,goto,如果跳转到临界区外,一定要先解锁再跳转
 primer0_busy.c
 
 
-4. 线程属性
-   线程同步的属性
+4. 线程属性		create2.c
+	pthread_create()的第二个参数const pthread_attr_t *attr就是线程属性
 	
-5. 重入
-   线程与信号的关系
-   线程与fork
+	pthread_attr_init(pthread_attr_t *attr);
+	pthread_attr_setstacksize();
+	见man手册pthread_attr_init的see also
 
+	当前64位环境,一个线程占1024*1024*1024大小的stack,可以创建4553个,每个线程创建一个i,取i的地址
+0x7fccf3bfde44
+0x7fcc6bbfbe44
+0x7fcd33bfee44
+0x7fcc2bbfae44
+0x7fcbebbf9e44
+0x7fcbabbf8e44
+0x7fccb3bfce44
+0x7fcb6bbf7e44
+count = 4553
+
+   线程同步的属性
+	互斥量属性: 
+		pthread_mutexattr_init();
+		pthread_mutexattr_destroy();
+		pthread_mutex_getpshared();
+		pthread_mutex_setpshared();//p代表process,是否跨进程
+		为什么线程还要跨进程,涉及函数clone
+		clone();
+//多线程共享了一些东西,多进程共享了一些东西
+//如果clone的flags用属性的极端分离,即什么都用自己的,那么创建的就是之前说的进程
+//如果什么都共用,文件描述符表共用,父进程也是同一个,文件系统信息也是同一个等等,那么创建的就是兄弟,相当于ptrhead_create的动作,创建了一个线程
+如果现实中发现多线程和多进程都不好用,一些需要共用,另一些不要共用,那么就可以用这个函数clone,其实进程线程就没有分的那么清楚
+		 CLONE_FILES (since Linux 2.0)
+              If CLONE_FILES is set, the calling process and the child process
+              share  the same file descriptor table.
+		fork是复制文件描述表,cone中的flags设置为CLONE_FILES表示共享文件描述表,实现进程间通信	
+		 CLONE_NEWPID (since Linux 2.6.24)
+		CLONE_PARENT(since Linux 2.3.12)
+
+		pthread_mutexattr_gettype();
+		pthread_mutexattr_settype();
+
+	条件变量属性:	
+		pthread_condattr_init()
+		pthread_condattr_destroy();
+	读写锁属性:
+		
+
+
+5. 重入:   信号产生重入,信号更难;线程重入,更简单
+	线程重入
+		1->puts(aaaaaa)
+		2->puts(bbbbbb)
+		3->puts(cccccc)
+			结果:aaaaaabbbbbbbbccccc都可能
+			不会出现abbbbaaccc交替输出的现象,因为多线程中的IO,库函数支持重入
+	
+	未加锁的函数:getchar_unlock();
+	多线程中的IO就是先把流锁住再解锁.
+
+	
+   线程与信号的关系
+	每条线程都会有自己的mask和pending. 
+	如果以进程为单位,没有mask,只有pending
+	如果一个线程给另一个线程发信号,那么实现的是在线程的pening的某一位上.
+	响应进程范围内的信号,要看当前从kernel态扎回到用户态调度的是那个线程,扎回来的时候做一个按位与,拿线程自己的mask和进程的pending做一个按位与,看一下以进程为单位收到了那些信号,再用线程自己的mask和线程自己的pending做按位与,再看当前线程收到了那些通知或者信号,所以其实是作了两次,之前说的模型是单进程单线程,线程级别的pending并未提及
+
+	
+	pthread_sigmask(); 相当于进程阶段的sigprocmask();
+	sigwait();
+	pthread_kill(); 类似kill();
+
+   线程与fork
+	posix线程中中fork:新的进程中只包含调用fork的那一个线程
+	dce线程认为,执行fork时就和原来进程是一样的
+	
+	文件锁可能会在创建子进程后也会出现意外. 文件锁在close时也会出现意外
+	posix只提供了类型推荐,标准,具体实现自己去实现
+	
+	openmp线程  ->  www.OpenMP.org
+	
+
+
+创建线程和创建进程效率差几倍,通信方式上进程有什么特点,线程有什么特点
+
+
+
+/***************************************************************************/
+
+				高级IO
+非阻塞IO ------ 阻塞IO
+阻塞和非阻塞的两种假错: EINTR(blocking,必须做到为止,出现打断信号就返回EINTR)和EAGAIN(non-blocking,尝试去读,没有就返回)
+
+补充:有限状态机编程
+
+1. 非阻塞IO
+	数据中继原理解析	p220   数据中继原理.png
+	简单流程 : 自然流程是结构化的
+	复杂流程 : 自然流程不是结构化的
+		
+	中继引擎实例 : 	nonblock/relayer.c 未完成,Aborted (core dumped)
+		IO密集型任务:IO多 负载重任务:大部分时间都在空闲
+
+
+
+2. IO多路转接(文件描述符的监视)
+	select();以事件为单位来组织文件描述符	古老,可移植
+		adv/select# ./relay 
+
+	poll(); 以文件描述符来组织事件		可移植  移植性和效率均可
+		
+	epoll();各自平台做的方言,不可移植,效率一般较高
+	EPOLL(7) 第7章讲机制,说了当前平台下的epoll怎么实现
+
+	sleep时提到了select,select前面的参数如果给的没有实际意义,而最后一个参数给了timeout,也可以实现sleep的功能
+	
+	int select(int nfds, fd_set *readfds, fd_set *writefds,
+                  fd_set *exceptfds, struct timeval *timeout);
+	nfds: 要监视的文件描述符的最大值+1,比如要监视1,3,4,8,那么这里要写9
+	readfds:所关心的可读的文件描述符
+	writfds:所关心的可写文件描述符
+	exceptfds:所关心的异常的文件描述符
+	timeout:-1,NULL,NULL,NULL,timeout不设置超时设置,就是死等,阻塞,直到等到感兴趣的事件发生
+	return value:返回值的个数是现在发生了你感兴趣的行为的文件描述符的个数
+		On success, select() and pselect() return the number of  file  descriptors  contained in the three returned descriptor sets (that is, the to‐
+       tal number of bits that are set in readfds, writefds, exceptfds).   The
+       return  value  may  be  zero if the timeout expired before any file de‐
+       scriptors became ready.
+
+       On error, -1 is returned, and errno is set to indicate the  error;  the
+       file descriptor sets are unmodified, and timeout becomes undefined.
+
+	
+	select:缺陷:	1.首个是int类型
+			2.没有const修饰
+			3.监视现场和监视结果放同一块空间
+			4.监视事件太过单一,读写异常
+			事件为单位监视文件描述符
+	poll: wait for some event on a file descriptor,以文件描述符组织事件
+			0表示非阻塞,-1表示阻塞,合法数值以毫秒为单位1000为1s
+		user	struct pollfd[n]    [0][1][2][3][4][5]用户态维护的数组
+		-----------------------------------------------
+		kernal
+		从用户角度维护的数组
+		
+	epoll: 
+
+		user
+		---------------------------------------------
+		kernal	内核  n	[][][][][][][]
+		kernal为你维护了这个数组来帮助管理所有的文件描述符的关心的事件,返回的事件等等,epoll_create()就是在这实现的数组,不过这个size写几都可以,是让内核以多大的数组来维护文件描述符,常规数值即可
+		
+
+3. 其他读写函数
+
+	多个碎片的小地址要写道同一个文件中
+	read or write data into multiple buffers
+	readv();
+	writev();
+
+	readn();
+	wirten();坚持写够write个字节,就是之前的write会出现假错,apue的作者觉得要用就封装出来了
+	
+
+
+4. 存储映射IO 最好用的共享内存了
+	存储映射IO能将一个磁盘文件映射到存储空间中的一个缓冲区上,于是,当从缓冲区取数据时,就相当于读文件中的相应字节.于此类似,将数据存入缓冲区时,相应字节就自动写入文件.这样,就可以在不使用read和write的情况下执行IO
+	mmap();
+	相当于把某一块内存,或者说某一块文件的存储内容映射到当前进程空间里,相当于访问一段char*的内容,就如同访问那段空间一样
+	
+
+	能帮我们作出一个非常快的共享内存
+	void *mmap(void *addr, size_t length, int prot, int flags,
+                  int fd, off_t offset);
+		addr:把内存映射到地址空间的位置
+	addr用NULL时就是自己找
+	可以用mmap代替动态内存管理的函数malloc和free,如果flags用了MAP_ANONYOUS,匿名映射,相当于malloc
+	从fd文件的offset偏移量开始,要length个字节放到addr地址来,映射过来的权限是prot,特殊要求是flags
+	
+	int munmap(void  *addr,size_t length);
+
+	具有亲缘关系的进程间通信:	sharedmemory.c
+	
+	int munmap(void *addr, size_t length);
+
+
+
+5. 文件锁
+	fcntl();
+	lockf();
+	flock();
+	
+	文件锁.png
+	通过文件描述符锁住一个文件,锁住的是inode上,而不是当前数组下标指向的文件信息结构体的层面,dup,dup2是把同一个文件信息结构体放到了数组的两个下标,同一个程序中对同一个文件打开两次,会生成两个文件信息结构体和两个fd,但是两个文件信息结构体指向同一个inode
+	通过另一个fd来close同一个inode,会导致文件解锁
+
+6.管道 thread/posix/mypipe/mypipe.c
+
+
+
+/***************************************************************************/
+				ipc
+	
+				进程间通信
+			同一台机器通信,不同机器通信
+1. 管道 
+	管道实际上就是磁盘上一文件
+
+	内核提供,单工,自同步机制(牵就慢的一方)
+	//这两种管道都是内核为你创建的
+	匿名管道	
+		pipe()
+	命名管道
+		mkfifo()
+		
+2. XSI ipc --前身-> SysV	自己写通信方式就是封装协议了
+	IPC -> Inter-Process Communication 进程间通信
+
+
+Documents/linux_c/io/ipc/xsi/msg/basic
+
+	主动端: 先发包的一方
+	被动端: 先收包的一方(先运行)
+
+
+	有亲缘关系的进程通信都可以,fork后子进程都能拿到,没有关系的进程关系就要用key
+	key : ftok(const char* pathname,int proj_id);产生同一种key值
+	pathname相当于哈希内容,proj_id相当于哈希杂质
+
+	利用同一个key值产生message queues,semaphore arrays和share memory sements
+
+	xxxget xxxop(使用)  xxxctl(控制) -> xxx -> msg sem shm
+
+Message Queues
+	https://www.cnblogs.com/52php/p/5862114.html
+	
+	msgget()
+	
+	msgop() //消息队列双工的
+ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp,
+                      int msgflg);
+msqid:msgget的返回值就是msgid.   msgp:要放到的空间   msgsz:要放的大小  msgtyp:
+取当中第几个包,假如消息队列10个包,取第msgtyp个包,其他还在排
+msgflg:特殊要求,位图
+The msgp argument is a pointer to a caller-defined structure of the following general form:
+
+           struct msgbuf {
+               long mtype;       /* message type, must be > 0 */
+               char mtext[1];    /* message data */
+           };
+
+int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+msqid:msgid  msgp:要取的空间  msgsz要取的大小  msgflg:特殊要求
+msg_sz 是msg_ptr指向的消息的长度，注意是消息的长度，而不是整个结构体的长度，也就是说msg_sz是不包括长整型消息类型成员变量的长度。
+
+	msgctl()			
+		msgctl(msgid,IPC_RMID,NULL);
+		//销毁msgid
+
+
+
+Semaphore Arrays信号量数组
+			例子:两个信号a和b,线程1锁住a请求b,线程2锁住b请求a出现死锁,
+		数组为1就相当于之前的mut了
+		可以让整个信号量数组原子化lock,避免死锁
+
+	int semget(key_t key, int nsems, int semflg);
+	key:key值   nsems:semaphore array中信号个数  semflg:一个元素
+	semid = semget(IPC_PRIVATE, 1 , 0600);  //IPC_PRIVATE
+,互斥量的个数,权限
+
+
+	int semctl(int semid, int semnum, int cmd, ...);
+	semid : semid  semnum :对谁,semphore num的下标值  cmd:做什么 
+
+	semctl(semid ,0,SETVAL, 1 ) ;  //初始化,对semid的下标为0的参数setval,设置初始值为1
+
+	semctl(semid , 0 , IPC_RMID );	//销毁, 用IPC_RMID的话0表示销毁当前semid,就不是下标了
+
+
+	int semop(int semid, struct sembuf *sops, size_t nsops);
+		semid:senid  sops:struct sembuf类型的一个数据   nsops:数组中有几个元素
+	
+	
+	while( semop(semid,&op,1) < 0 ) //从资源量减1,做op,资源总量
+        {
+                if(error != EINTR || error != EAGAIN)//真错,结束
+                {
+                        perror();
+                        exit(1);
+                }
+		//假错,继续做
+        }
+
+	
+
+
+
+
+
+
+
+
+
+Shared Memory Segments共享内存
+
+	shmget(IPC_PRIVATE,  ,);        //key_t key,要设置的共享内存的size大小,shmflg特殊要求	
+
+	shmop
+
+	shmctl
+
+
+key : ftok()
+首先创建实例xxxget,有必要的话要用ftok获取一个key值,用key值创建一个ipc实例,然后用xxxop获取
+
+
+3. 网络套接字 socket
+	讨论: 跨主机的传输要注意的问题
+	1. 字节序问题: 大端存储   ,   小段存储
+		大端: 低地址处放高字节
+		小端: 低地址处放低字节
+			   0x0000 0005
+			大 05 00 00 00	 
+			小 00 00 00 05
+		文件传输或者IO都是低地址处先出去
+		
+		因此
+			区分主机字节序 和 网络字节序
+		
+		主机字节序 : host
+		网络字节序 : network
+		解决 :_ to _ _ : htons , htonl , ntohs , ntohl
+			 htons: host to network 2个字节16位
+			 htonl: host to network 4个字节32位
+
+	2. 对齐 :   解决:不对齐
+		struct
+		{
+			//char ch1;
+			int i;
+			float f ;
+			//char ch2;
+			char ch ;
+		};
+		字存储,双字存储,半字存储
+		基本都向字存储靠拢
+		所以该结构体默认12 ,ch1和ch2只选一个,如果有ch1就是16,如果有ch2就12
+		32位int4个字节对齐,64位可能出现其他情况导致通过指针没法找
+	
+	3. 类型长度问题
+		int 占多大 16位占2个字节 ,32位占4个
+		char有无符号
+		解决: int32_t ,uint32_t , int64_t ,int8_t ,uint8_t
+
+	socket是什么:
+		网络实现方式			流式套接字  报式套接字  其他
+		中间层		int 文件描述符<-socket
+		协议族				ipv4 s025 ips 
+
+	int socket(int domain, int type, int protocol);
+		domain :协议族    type:类型   protocal:某种协议
+		AF_PACKET,网卡驱动层,嗅探器/抓包器就是用类似这个写的,网络层抓不到报头装的什么
+
+		消息队列映射到今天就是SOCK_SEQPACKET ,有序的,可靠的,双方建立连接的,报式通信
+		
+
+
+	报式套接字:
+		
+
+
+	流式套接字:
 
 
 

@@ -33,6 +33,8 @@ int main()
 		fprintf(stderr,"at_addjob():%s\n",strerror(-job1));
 	}
 	job2 = at_addjob(2,f2,"bbb");
+	//调用函数传参,执行完函数才能继续下一步,造成误差累计
+	//改成fork一个子进程或者抛出一个线程
 	if(job2 < 0)
 	{
 		fprintf(stderr,"at_addjob():%s\n",strerror(-job2));
